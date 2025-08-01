@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+  name     String
+}
+
+model Faculty {
+  id    Int    @id @default(autoincrement())
+  name  String
+  attendances Attendance[]
+}
+
+model Department {
+  id        Int       @id @default(autoincrement())
+  name      String
+  divisions Division[]
+  subjects  Subject[]
+}
+
+model Division {
+  id            Int           @id @default(autoincrement())
+  name          String
+  totalStudents Int
+  department    Department    @relation(fields: [departmentId], references: [id])
+  departmentId  Int
+  subDivisions  SubDivision[]
+  attendances   Attendance[]
+}
+
+model SubDivision {
+  id         Int      @id @default(autoincrement())
+  name       String
+  students   Int
+  division   Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  divisionId Int
+  attendances Attendance[]
+}
+
+model Subject {
+  id           Int        @id @default(autoincrement())
+  name         String
+  department   Department @relation(fields: [departmentId], references: [id])
+  departmentId Int
+  attendances  Attendance[]
+}
+
+model Timing {
+  id    Int    @id @default(autoincrement())
+  label String
+  attendances Attendance[]
+}
+
+model Attendance {
+  id           Int        @id @default(autoincrement())
+  division     Division   @relation(fields: [divisionId], references: [id])
+  divisionId   Int
+  subDivision  SubDivision? @relation(fields: [subDivisionId], references: [id])
+  subDivisionId Int?
+  subject      Subject    @relation(fields: [subjectId], references: [id])
+  subjectId    Int
+  faculty      Faculty    @relation(fields: [facultyId], references: [id])
+  facultyId    Int
+  timing       Timing     @relation(fields: [timingId], references: [id])
+  timingId     Int
+  presentCount Int
+  attendanceDate DateTime @default(now())
+}
