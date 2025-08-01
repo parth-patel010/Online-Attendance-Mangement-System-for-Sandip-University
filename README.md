@@ -255,3 +255,5 @@ This project is developed for Sandip University. All rights reserved.
 ---
 
 *Built with ❤️ for Sandip University*
+#   O n l i n e - A t t e n d a n c e - M a n g e m e n t - S y s t e m - f o r - S a n d i p - U n i v e r s i t y  
+ 
