@@ -278,8 +278,8 @@ export default function AttendancePortal() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
-            <div className="max-w-2xl mx-auto">
+        <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+            <div className="max-w-2xl mx-auto w-full">
                 {/* Logo and Header */}
                 <motion.div
                     className="flex flex-col sm:flex-row items-center justify-between mb-6 sm:mb-8 gap-4"
@@ -364,7 +364,7 @@ export default function AttendancePortal() {
                                     <SelectTrigger className="text-sm sm:text-base">
                                         <SelectValue placeholder="Select timing" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
                                         {Array.isArray(timings) && timings.map((timing) => (
                                             <SelectItem key={timing.id} value={timing.id.toString()}>
                                                 {timing.label}
@@ -381,7 +381,7 @@ export default function AttendancePortal() {
                                     <SelectTrigger className="text-sm sm:text-base">
                                         <SelectValue placeholder="Select department" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
                                         {Array.isArray(departments) && departments.map((department) => (
                                             <SelectItem key={department.id} value={department.id.toString()}>
                                                 {department.name}
@@ -398,7 +398,7 @@ export default function AttendancePortal() {
                                     <SelectTrigger className="text-sm sm:text-base">
                                         <SelectValue placeholder="Select division" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
                                         {Array.isArray(divisions) && divisions.map((division) => (
                                             <SelectItem key={division.id} value={division.id.toString()}>
                                                 {division.name} ({division.totalStudents} students)
@@ -412,7 +412,7 @@ export default function AttendancePortal() {
                             {selectedDivisionData && selectedDivisionData.subDivisions.length > 0 && (
                                 <div className="space-y-3">
                                     <Label className="text-sm sm:text-base">Sub-Divisions (Select which batches to include)</Label>
-                                    <div className="grid grid-cols-1 gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg bg-slate-50">
+                                    <div className="max-h-[300px] overflow-y-auto grid grid-cols-1 gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg bg-slate-50">
                                         {selectedDivisionData.subDivisions.map((subDivision) => (
                                             <div key={subDivision.id} className="flex items-center space-x-3">
                                                 <Checkbox
@@ -441,7 +441,7 @@ export default function AttendancePortal() {
                                     <SelectTrigger className="text-sm sm:text-base">
                                         <SelectValue placeholder="Select subject" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
                                         {Array.isArray(subjects) && subjects.map((subject) => (
                                             <SelectItem key={subject.id} value={subject.id.toString()}>
                                                 {subject.name}
@@ -458,7 +458,7 @@ export default function AttendancePortal() {
                                     <SelectTrigger className="text-sm sm:text-base">
                                         <SelectValue placeholder="Select faculty" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="max-h-[200px] overflow-y-auto">
                                         {Array.isArray(faculty) && faculty.map((facultyMember) => (
                                             <SelectItem key={facultyMember.id} value={facultyMember.id.toString()}>
                                                 {facultyMember.name}
