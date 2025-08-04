@@ -395,12 +395,6 @@ export default function AdminDashboard() {
     };
 
     const exportToCSV = () => {
-        // Calculate total attendance percentage
-        const totalPresent = attendanceRecords.reduce((sum, record) => sum + record.presentCount, 0);
-        const totalStudents = attendanceRecords.reduce((sum, record) => sum + record.totalStudents, 0);
-        const totalPercentage = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
-        const totalLectures = attendanceRecords.length;
-
         // Generate date comment based on selected time range
         const getDateComment = () => {
             const today = new Date();
@@ -427,41 +421,73 @@ export default function AdminDashboard() {
         };
 
         const headers = ['Division/Sub-Division', 'Subject', 'Faculty', 'Time', 'Present Count', 'Total Students', 'Percentage', 'Date'];
-        const csvData = attendanceRecords.map(record => [
-            record.attendanceType,
-            record.subject.name,
-            record.faculty.name,
-            record.timing.label,
-            record.presentCount,
-            record.totalStudents,
-            `${record.percentage}%`,
-            new Date(record.attendanceDate).toLocaleDateString()
-        ]);
 
-        // Add date comment and summary rows
-        const summaryRows = [
-            [],
-            [getDateComment()],
-            [],
-            ['SUMMARY'],
-            [`Total Lectures: ${totalLectures}`],
-            [`Total Present Students: ${totalPresent}`],
-            [`Total Students: ${totalStudents}`],
-            [`Overall Attendance Percentage: ${totalPercentage}%`],
-            []
-        ];
+        // Group records by department and division
+        const groupedRecords: { [key: string]: AttendanceRecord[] } = {};
 
-        const csvContent = [headers, ...csvData, ...summaryRows]
-            .map(row => row.map(cell => `"${cell}"`).join(','))
-            .join('\n');
+        attendanceRecords.forEach(record => {
+            const departmentName = record.division.department?.name || 'Unknown Department';
+            const divisionName = record.division.name;
+            const key = `${departmentName}-${divisionName}`;
 
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `attendance-report-${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
+            if (!groupedRecords[key]) {
+                groupedRecords[key] = [];
+            }
+            groupedRecords[key].push(record);
+        });
+
+        // Export separate CSV for each department-division combination
+        Object.entries(groupedRecords).forEach(([key, records]) => {
+            const [departmentName, divisionName] = key.split('-');
+
+            // Calculate summary statistics for this group
+            const totalPresent = records.reduce((sum, record) => sum + record.presentCount, 0);
+            const totalStudents = records.reduce((sum, record) => sum + record.totalStudents, 0);
+            const totalPercentage = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+            const totalLectures = records.length;
+
+            const csvData = records.map(record => [
+                record.attendanceType,
+                record.subject.name,
+                record.faculty.name,
+                record.timing.label,
+                record.presentCount,
+                record.totalStudents,
+                `${record.percentage}%`,
+                new Date(record.attendanceDate).toLocaleDateString()
+            ]);
+
+            // Add date comment and summary rows
+            const summaryRows = [
+                [],
+                [getDateComment()],
+                [],
+                [`Department: ${departmentName}`],
+                [`Division: ${divisionName}`],
+                [],
+                ['SUMMARY'],
+                [`Total Lectures: ${totalLectures}`],
+                [`Total Present Students: ${totalPresent}`],
+                [`Total Students: ${totalStudents}`],
+                [`Overall Attendance Percentage: ${totalPercentage}%`],
+                []
+            ];
+
+            const csvContent = [headers, ...csvData, ...summaryRows]
+                .map(row => row.map(cell => `"${cell}"`).join(','))
+                .join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // Create filename with department and division names
+            const safeDepartmentName = departmentName.replace(/[^a-zA-Z0-9]/g, '_');
+            const safeDivisionName = divisionName.replace(/[^a-zA-Z0-9]/g, '_');
+            a.download = `attendance-${safeDepartmentName}-${safeDivisionName}-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
     };
 
     const renderReportsTab = () => {
@@ -548,7 +574,7 @@ export default function AdminDashboard() {
                             </div>
                             <div className="flex items-end">
                                 <Button onClick={exportToCSV} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 text-sm sm:text-base">
-                                    Download CSV
+                                    Export CSV (Separate Files)
                                 </Button>
                             </div>
                         </div>
