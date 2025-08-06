@@ -5,6 +5,7 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const divisionId = searchParams.get('divisionId');
+        const departmentId = searchParams.get('departmentId');
         const timeRange = searchParams.get('timeRange') || 'today';
 
         // Build date filter based on time range
@@ -45,6 +46,12 @@ export async function GET(request: Request) {
 
         if (divisionId) {
             whereClause.divisionId = parseInt(divisionId);
+        }
+
+        if (departmentId) {
+            whereClause.division = {
+                departmentId: parseInt(departmentId)
+            };
         }
 
         const attendanceRecords = await prisma.attendance.findMany({

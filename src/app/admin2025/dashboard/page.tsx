@@ -97,6 +97,7 @@ export default function AdminDashboard() {
 
     // Filter states
     const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('all');
+    const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<string>('all');
     const [selectedTimeRange, setSelectedTimeRange] = useState<string>('today');
 
     useEffect(() => {
@@ -107,7 +108,7 @@ export default function AdminDashboard() {
         if (activeTab === 'reports') {
             fetchAttendanceReports();
         }
-    }, [activeTab, selectedDivisionFilter, selectedTimeRange]);
+    }, [activeTab, selectedDivisionFilter, selectedDepartmentFilter, selectedTimeRange]);
 
     const fetchData = async () => {
         try {
@@ -165,10 +166,30 @@ export default function AdminDashboard() {
         }
     };
 
+    // Function to detect semester from department name
+    const detectSemesterFromDepartment = (departmentName: string) => {
+        // Look for numbers 1-8 in the department name
+        const semesterMatch = departmentName.match(/(\d+)/);
+        if (semesterMatch) {
+            const semester = parseInt(semesterMatch[1]);
+            if (semester >= 1 && semester <= 8) {
+                // Extract the department name without the number
+                const deptNameWithoutNumber = departmentName.replace(/\d+/g, '').trim();
+                return {
+                    departmentName: deptNameWithoutNumber,
+                    semester: semester,
+                    fullName: `${deptNameWithoutNumber} ${semester} SEM`
+                };
+            }
+        }
+        return null;
+    };
+
     const fetchAttendanceReports = async () => {
         try {
             const params = new URLSearchParams();
             if (selectedDivisionFilter && selectedDivisionFilter !== 'all') params.append('divisionId', selectedDivisionFilter);
+            if (selectedDepartmentFilter && selectedDepartmentFilter !== 'all') params.append('departmentId', selectedDepartmentFilter);
             if (selectedTimeRange) params.append('timeRange', selectedTimeRange);
 
             const response = await fetch(`/api/admin/attendance-reports?${params}`);
@@ -422,7 +443,87 @@ export default function AdminDashboard() {
 
         const headers = ['Division/Sub-Division', 'Subject', 'Faculty', 'Time', 'Present Count', 'Total Students', 'Percentage', 'Date'];
 
-        // Group records by department and division
+        // Get selected department info for filename
+        const getSelectedDepartmentInfo = () => {
+            if (selectedDepartmentFilter && selectedDepartmentFilter !== 'all') {
+                const selectedDept = departments.find(dept => dept.id.toString() === selectedDepartmentFilter);
+                if (selectedDept) {
+                    const semesterInfo = detectSemesterFromDepartment(selectedDept.name);
+                    return semesterInfo ? semesterInfo.fullName : selectedDept.name;
+                }
+            }
+            return null;
+        };
+
+        // If a specific department is selected, create a single CSV for that department
+        if (selectedDepartmentFilter && selectedDepartmentFilter !== 'all') {
+            const selectedDept = departments.find(dept => dept.id.toString() === selectedDepartmentFilter);
+            if (selectedDept) {
+                const semesterInfo = detectSemesterFromDepartment(selectedDept.name);
+                const deptDisplayName = semesterInfo ? semesterInfo.fullName : selectedDept.name;
+
+                // Calculate summary statistics for this department
+                const totalLectures = attendanceRecords.length;
+
+                // Calculate total students correctly - sum up unique class sizes
+                const uniqueDivisions = new Map();
+                attendanceRecords.forEach(record => {
+                    const divisionKey = record.division.id;
+                    if (!uniqueDivisions.has(divisionKey)) {
+                        uniqueDivisions.set(divisionKey, record.totalStudents);
+                    }
+                });
+                const totalStudents = Array.from(uniqueDivisions.values()).reduce((sum, students) => sum + students, 0);
+
+                // Calculate average present students instead of total
+                const totalPresent = attendanceRecords.length > 0 ?
+                    Math.round(attendanceRecords.reduce((sum, record) => sum + record.presentCount, 0) / attendanceRecords.length) : 0;
+
+                const totalPercentage = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+
+                const csvData = attendanceRecords.map(record => [
+                    record.attendanceType,
+                    record.subject.name,
+                    record.faculty.name,
+                    record.timing.label,
+                    record.presentCount,
+                    record.totalStudents,
+                    `${record.percentage}%`,
+                    new Date(record.attendanceDate).toLocaleDateString()
+                ]);
+
+                // Add date comment and summary rows
+                const summaryRows = [
+                    [],
+                    [getDateComment()],
+                    [],
+                    [`Department: ${deptDisplayName}`],
+                    [],
+                    ['SUMMARY'],
+                    [`Total Lectures: ${totalLectures}`],
+                    [`Total Present Students: ${totalPresent}`],
+                    [`Total Students: ${totalStudents}`],
+                    [`Overall Attendance Percentage: ${totalPercentage}%`],
+                    []
+                ];
+
+                const csvContent = [headers, ...csvData, ...summaryRows]
+                    .map(row => row.map(cell => `"${cell}"`).join(','))
+                    .join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const safeDeptName = deptDisplayName.replace(/[^a-zA-Z0-9]/g, '_');
+                a.download = `attendance-${safeDeptName}-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                return;
+            }
+        }
+
+        // Group records by department and division (for when no specific department is selected)
         const groupedRecords: { [key: string]: AttendanceRecord[] } = {};
 
         attendanceRecords.forEach(record => {
@@ -441,10 +542,23 @@ export default function AdminDashboard() {
             const [departmentName, divisionName] = key.split('-');
 
             // Calculate summary statistics for this group
-            const totalPresent = records.reduce((sum, record) => sum + record.presentCount, 0);
-            const totalStudents = records.reduce((sum, record) => sum + record.totalStudents, 0);
-            const totalPercentage = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
             const totalLectures = records.length;
+
+            // Calculate total students correctly - sum up unique class sizes
+            const uniqueDivisions = new Map();
+            records.forEach(record => {
+                const divisionKey = record.division.id;
+                if (!uniqueDivisions.has(divisionKey)) {
+                    uniqueDivisions.set(divisionKey, record.totalStudents);
+                }
+            });
+            const totalStudents = Array.from(uniqueDivisions.values()).reduce((sum, students) => sum + students, 0);
+
+            // Calculate average present students instead of total
+            const totalPresent = records.length > 0 ?
+                Math.round(records.reduce((sum, record) => sum + record.presentCount, 0) / records.length) : 0;
+
+            const totalPercentage = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
 
             const csvData = records.map(record => [
                 record.attendanceType,
@@ -484,18 +598,36 @@ export default function AdminDashboard() {
             // Create filename with department and division names
             const safeDepartmentName = departmentName.replace(/[^a-zA-Z0-9]/g, '_');
             const safeDivisionName = divisionName.replace(/[^a-zA-Z0-9]/g, '_');
-            a.download = `attendance-${safeDepartmentName}-${safeDivisionName}-${new Date().toISOString().split('T')[0]}.csv`;
+
+            // Add selected department info to filename if available
+            const selectedDeptInfo = getSelectedDepartmentInfo();
+            const deptPrefix = selectedDeptInfo ? `${selectedDeptInfo.replace(/[^a-zA-Z0-9]/g, '_')}-` : '';
+
+            a.download = `attendance-${deptPrefix}${safeDepartmentName}-${safeDivisionName}-${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
         });
     };
 
     const renderReportsTab = () => {
-        // Calculate summary statistics
-        const totalPresent = attendanceRecords.reduce((sum, record) => sum + record.presentCount, 0);
-        const totalStudents = attendanceRecords.reduce((sum, record) => sum + record.totalStudents, 0);
-        const totalPercentage = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+        // Calculate summary statistics - Fix the total students calculation
         const totalLectures = attendanceRecords.length;
+
+        // Calculate total students correctly - sum up unique class sizes
+        const uniqueDivisions = new Map();
+        attendanceRecords.forEach(record => {
+            const divisionKey = record.division.id;
+            if (!uniqueDivisions.has(divisionKey)) {
+                uniqueDivisions.set(divisionKey, record.totalStudents);
+            }
+        });
+        const totalStudents = Array.from(uniqueDivisions.values()).reduce((sum, students) => sum + students, 0);
+
+        // Calculate average present students instead of total
+        const totalPresent = attendanceRecords.length > 0 ?
+            Math.round(attendanceRecords.reduce((sum, record) => sum + record.presentCount, 0) / attendanceRecords.length) : 0;
+
+        const totalPercentage = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
 
         return (
             <div className="space-y-4 sm:space-y-6">
@@ -541,7 +673,26 @@ export default function AdminDashboard() {
                         <CardTitle className="text-base sm:text-lg">Filters</CardTitle>
                     </CardHeader>
                     <CardContent className="px-4 sm:px-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-sm sm:text-base">Department/Semester</Label>
+                                <Select value={selectedDepartmentFilter} onValueChange={setSelectedDepartmentFilter}>
+                                    <SelectTrigger className="text-sm sm:text-base">
+                                        <SelectValue placeholder="All departments" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All departments</SelectItem>
+                                        {Array.isArray(departments) && departments.map((department) => {
+                                            const semesterInfo = detectSemesterFromDepartment(department.name);
+                                            return (
+                                                <SelectItem key={department.id} value={department.id.toString()}>
+                                                    {semesterInfo ? semesterInfo.fullName : department.name}
+                                                </SelectItem>
+                                            );
+                                        })}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             <div className="space-y-2">
                                 <Label className="text-sm sm:text-base">Division</Label>
                                 <Select value={selectedDivisionFilter} onValueChange={setSelectedDivisionFilter}>
@@ -550,11 +701,19 @@ export default function AdminDashboard() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All divisions</SelectItem>
-                                        {Array.isArray(divisions) && divisions.map((division) => (
-                                            <SelectItem key={division.id} value={division.id.toString()}>
-                                                {division.name} ({division.department?.name})
-                                            </SelectItem>
-                                        ))}
+                                        {Array.isArray(divisions) && divisions
+                                            .filter(division => {
+                                                // If a department is selected, only show divisions from that department
+                                                if (selectedDepartmentFilter && selectedDepartmentFilter !== 'all') {
+                                                    return division.departmentId.toString() === selectedDepartmentFilter;
+                                                }
+                                                return true;
+                                            })
+                                            .map((division) => (
+                                                <SelectItem key={division.id} value={division.id.toString()}>
+                                                    {division.name} ({division.department?.name})
+                                                </SelectItem>
+                                            ))}
                                     </SelectContent>
                                 </Select>
                             </div>
